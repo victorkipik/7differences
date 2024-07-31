@@ -1,0 +1,192 @@
+﻿@page
+@model JeuModel
+@{
+    ViewData["Title"] = "Jeu";
+}
+
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Xsrf
+@functions{
+    public string? GetAntiXsrfRequestToken()
+    {
+        return Xsrf.GetAndStoreTokens(Model.HttpContext).RequestToken;
+    }
+}
+
+<div class="text-center">
+    <h1 class="display-4">Score <span id="score"></span> - <span id="stopwatch">00:00:00</span></h1>
+
+    <div class="row game-container">
+        <div class="col image-container">
+            <img class="img-fluid " id="image1" src="~/img/4.jpg" alt="Image 1">
+        </div>
+        <div class="col image-container">
+            <img class="img-fluid " id="image2" src="~/img/5.jpg" alt="Image 2">
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="bravoModal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Bravo</h4>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                Vous avez trouvé en <span id="secondes"></span> secondes.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts
+{
+    <script>
+        var startTime;
+        var stopwatchInterval;
+        var elapsedPausedTime = 0;
+
+        function startStopwatch() {
+            if (!stopwatchInterval) {
+                startTime = new Date().getTime() - elapsedPausedTime;
+                stopwatchInterval = setInterval(updateStopwatch, 1000);
+            }
+        }
+
+        function stopStopwatch() {
+            clearInterval(stopwatchInterval);
+            elapsedPausedTime = new Date().getTime() - startTime;
+            stopwatchInterval = null;
+        }
+
+        function resetStopwatch() {
+            stopStopwatch();
+            elapsedPausedTime = 0;
+            document.getElementById("stopwatch").innerHTML = "00:00:00";
+        }
+
+        function updateStopwatch() {
+            var currentTime = new Date().getTime();
+            var elapsedTime = currentTime - startTime;
+            var seconds = Math.floor(elapsedTime / 1000) % 60;
+            var minutes = Math.floor(elapsedTime / 1000 / 60) % 60;
+            var hours = Math.floor(elapsedTime / 1000 / 60 / 60);
+            var displayTime = pad(hours) + ":" + pad(minutes) + ":" + pad(seconds);
+            document.getElementById("stopwatch").innerHTML = displayTime;
+        }
+
+        function pad(number) {
+            return (number < 10 ? "0" : "") + number;
+        }
+
+        addEventListener("resize", (event) => { });
+
+        document.addEventListener('DOMContentLoaded',
+            function () {
+                startStopwatch();
+
+                const differences = [
+                    { y: 235, x: 486, width: 110, height: 117 },
+                    { y: 3, x: 715, width: 114, height: 167 },
+                    { y: 539, x: 1222, width: 225, height: 101 },
+                    { y: 1006, x: 1463, width: 123, height: 157 },
+                    { y: 1057, x: 489, width: 292, height: 317 },
+                    { y: 1267, x: 46, width: 67, height: 71 },
+                    { y: 1868, x: 440, width: 153, height: 148 }
+                ];
+
+                let foundDifferences = [];
+
+                setScore();
+                //showHelp();
+
+                document.querySelectorAll('.image-container img').forEach((img, imgIndex) => {
+                    img.addEventListener('click',
+                        (event) => {
+                            const imgRect = img.getBoundingClientRect();
+
+                            const clickx = event.clientX + window.scrollX;
+                            const clicky = event.clientY + window.scrollY;
+
+                            differences.forEach((diff, diffIndex) => {
+
+                                var ratioX = img.width / img.naturalWidth;
+                                var ratioY = img.height / img.naturalHeight;
+                                var diffx = imgRect.left + (diff.x * ratioX) + window.scrollX;
+                                var diffy = imgRect.top + (diff.y * ratioY) + window.scrollY;
+                                var diffwidth = diff.width * ratioX;
+                                var diffheight = diff.height * ratioY;
+
+                                if (clickx >= diffx && clickx <= diffx + diffwidth && clicky >= diffy && clicky <= diffy + diffheight) {
+                                    if (!foundDifferences.includes(diffIndex)) {
+                                        foundDifferences.push(diffIndex);
+
+                                        const highlight = document.createElement('div');
+                                        highlight.className = 'highlight';
+                                        highlight.style.left = `${diffx}px`;
+                                        highlight.style.top = `${diffy}px`;
+                                        highlight.style.width = `${diffwidth}px`;
+                                        highlight.style.height = `${diffheight}px`;
+                                        img.parentElement.appendChild(highlight);
+
+                                        if (foundDifferences.length === differences.length) {
+                                            stopStopwatch();
+
+                                            let duree = Math.floor(elapsedPausedTime / 1000);
+
+                                            $.ajax({
+                                                type: "POST",
+                                                url: "/Jeu?handler=SaveScore",
+                                                data: { "duree": duree },
+                                                contentType: 'application/x-www-form-urlencoded',
+                                                dataType: "json",
+                                                headers: { "RequestVerificationToken": '@GetAntiXsrfRequestToken()' },
+                                                success: function (msg) { console.log(msg); }
+                                            });
+
+                                            document.getElementById("secondes").innerText = duree;
+
+                                            let bravoModal = new bootstrap.Modal(document.getElementById('bravoModal'), {});
+                                            bravoModal.show();
+                                        }
+
+                                        setScore();
+                                    }
+                                }
+                            });
+                        });
+                });
+
+                function setScore() {
+                    document.getElementById('score').innerText = foundDifferences.length + '/' + differences.length;
+                }
+
+                function showHelp() {
+                    document.querySelectorAll('.image-container img').forEach((img, imgIndex) => {
+                        var imgRect = img.getBoundingClientRect();
+
+                        differences.forEach((diff, diffIndex) => {
+
+                            var ratioX = img.width / img.naturalWidth;
+                            var ratioY = img.height / img.naturalHeight;
+                            var x = imgRect.left + (diff.x * ratioX) + window.scrollX;
+                            var y = imgRect.top + (diff.y * ratioY) + window.scrollY;
+                            var width = diff.width * ratioX;
+                            var height = diff.height * ratioY;
+
+                            const highlight = document.createElement('div');
+                            highlight.className = 'highlight';
+                            highlight.style.left = `${x}px`;
+                            highlight.style.top = `${y}px`;
+                            highlight.style.width = `${width}px`;
+                            highlight.style.height = `${height}px`;
+                            img.parentElement.appendChild(highlight);
+                        });
+                    });
+                }
+            });
+    </script>
+}

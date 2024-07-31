@@ -5,15 +5,25 @@
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">Jeu des 7 différences</h1>
+    @* <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p> *@
 </div>
 
-<div class="row text-center">
-    <div class="col">
-        image 1
-    </div>
-    <div class="col">
-        image 2
+<div class="row">
+    <div class="col-md-4 offset-md-4">
+        <form method="post">
+            <div class="mb-3">
+                <label asp-for="NomJoueur" class="form-label">Nom</label>
+                <input type="text" class="form-control" asp-for="NomJoueur" aria-describedby="nomHelp">
+                <span asp-validation-for="NomJoueur" class="text-danger"></span>
+                @* <div id="nomHelp" class="form-text">Nom du joueur</div> *@
+            </div>
+            <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" asp-for="Accepte">
+                <label class="form-check-label" asp-for="Accepte">J'accepte</label>
+                <span asp-validation-for="Accepte" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Commencer</button>
+        </form>
     </div>
 </div>
